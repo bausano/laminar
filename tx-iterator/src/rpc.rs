@@ -1,9 +1,15 @@
-use crate::helpers::retry;
+use crate::helpers::retry_rpc;
 use crate::prelude::*;
-use futures::Future;
 use sui_sdk::SuiClient;
 use tokio::time::sleep;
 
+/// Fetches digests from given seq# inclusive.
+///
+/// This fn never returns an empty vector, it keeps polling until new digests
+/// are available.
+///
+/// Each RPC call is retried a few times with an exponential back-off before
+/// returning an error.
 pub async fn fetch_digests(
     sui: &SuiClient,
     start_from_seqnum: SeqNum,
@@ -32,14 +38,4 @@ pub async fn fetch_digests(
             sleep(consts::SLEEP_ON_NO_NEW_TXS).await;
         };
     }
-}
-
-async fn retry_rpc<T, F>(job: impl FnMut() -> F) -> Result<T>
-where
-    F: Future<Output = Result<T>>,
-{
-    // 1st retry after 10ms
-    // 2nd retry after 100ms
-    // 3rd retry after 1s
-    retry(job, 3, 10, 10).await
 }
