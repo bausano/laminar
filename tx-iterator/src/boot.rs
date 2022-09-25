@@ -1,5 +1,5 @@
 //! When the service boots it needs to determine which db to connect to based
-//! on its [`Role`] - [`Env::db_conn_to_boot_with`].
+//! on its [`Role`] - [`Conf::db_conn_to_boot_with`].
 //!
 //! Then it needs to determine which seq# to start iterating from -
 //! [`find_seqnum_to_start_iterating_from`].

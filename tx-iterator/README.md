@@ -32,3 +32,14 @@ The supervisor job periodically queries the seq# of each iterator to create
 checkpoints.
 When an iterator for a specific RPC node is restarted, they start iterating from
 the checkpoint onwards.
+
+# Env
+
+```
+RUST_LOG=
+SUI_NODE_URL=
+WRITER_CONN_CONF=
+INITIAL_SEQ_NUM=
+SUPPORT_CONN_CONF=
+HTTP_ADDR=
+```

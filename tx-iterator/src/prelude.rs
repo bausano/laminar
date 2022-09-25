@@ -1,4 +1,4 @@
-pub(crate) use crate::consts;
+pub use crate::conf::consts;
 pub use anyhow::{bail, Context, Result};
 pub use log::{error, warn};
 pub use sui_sdk::rpc_types::GatewayTxSeqNumber as SeqNum;
