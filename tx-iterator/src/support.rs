@@ -1,5 +1,5 @@
 use crate::prelude::*;
 
-pub async fn spawn() -> Result<()> {
+pub async fn start() -> Result<()> {
     Ok(())
 }

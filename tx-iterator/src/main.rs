@@ -24,8 +24,8 @@ async fn main() -> Result<()> {
     // TODO: expose http server for seq#, status and role
 
     if conf.is_leader() {
-        leader::spawn(conf, sui, db, start_iterating_from_seqnum).await
+        leader::start(conf, sui, db, start_iterating_from_seqnum).await
     } else {
-        support::spawn().await
+        support::start().await
     }
 }

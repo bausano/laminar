@@ -4,7 +4,17 @@ use crate::{db, rpc};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-pub async fn spawn(
+/// Starts polling RPC for new digests and persists them into db.
+///
+/// RPC errors are retried based on implementation in [`crate::rpc`] module.
+/// If the retries failed, this fn returns an error.
+///
+/// Db error logged, then a new connection is created. If the new connection
+/// does not work, this fn returns an error.
+///
+/// This fn fetches from RPC and inserts into db in parallel. While prev
+/// iteration is being persisted, new digests are being fetched.
+pub async fn start(
     conf: Conf,
     sui: SuiClient,
     mut db: DbClient,
