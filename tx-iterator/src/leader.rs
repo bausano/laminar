@@ -1,11 +1,11 @@
-use crate::env::Env;
+use crate::conf::Conf;
 use crate::prelude::*;
 use crate::{db, rpc};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 pub async fn spawn(
-    env: Env,
+    conf: Conf,
     sui: SuiClient,
     mut db: DbClient,
     a_next_fetch_from_seqnum: Arc<AtomicU64>,
@@ -38,7 +38,7 @@ pub async fn spawn(
                 fetch_from_seqnum, db_err
             );
 
-            db = env
+            db = conf
                 .writer_db()
                 .await
                 .context("Cannot revive db connection")?;

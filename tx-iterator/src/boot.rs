@@ -1,9 +1,15 @@
-use crate::env::{Env, Role};
+//! When the service boots it needs to determine which db to connect to based
+//! on its [`Role`] - [`Env::db_conn_to_boot_with`].
+//!
+//! Then it needs to determine which seq# to start iterating from -
+//! [`find_seqnum_to_start_iterating_from`].
+
+use crate::conf::{Conf, Role};
 use crate::prelude::*;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
-impl Env {
+impl Conf {
     /// The connection that was passed from env.
     ///
     /// # Note
@@ -31,6 +37,9 @@ impl Env {
     }
 }
 
+/// Returns an atomic [`u64`] as that's the inner type of the [`SeqNum`].
+/// We use atomic to share information about where the tx-iterator currently is
+/// with http server which runs in this service. This is used by supervisor.
 pub async fn find_seqnum_to_start_iterating_from(
     _db: &DbClient,
     sui: &SuiClient,
@@ -53,7 +62,6 @@ pub async fn find_seqnum_to_start_iterating_from(
 
     let start_iterating_from_seqnum =
         if let Some(_latest_db_digest) = latest_db_digest {
-            // https://discord.com/channels/916379725201563759/1006322742620069898/1023675518001872940
             unimplemented!(
                 "Sui SDK does not yet support mapping from digest to seq#"
             );

@@ -14,7 +14,7 @@ pub enum Role {
 }
 
 #[derive(Clone, Debug)]
-pub struct Env {
+pub struct Conf {
     /// If spawned as a leader, it will write digests into
     /// [`Env::writer_conn_conf`].
     /// If a support it will validate state from the provided (presumably
@@ -38,12 +38,8 @@ pub struct Env {
     pub initial_seq_num: Option<SeqNum>,
 }
 
-impl Env {
-    pub fn is_leader(&self) -> bool {
-        matches!(self.spawned_as, Role::Leader)
-    }
-
-    pub fn read() -> Result<Self> {
+impl Conf {
+    pub fn from_env() -> Result<Self> {
         let sui_node_url = env::var("SUI_NODE_URL").context("Sui Node URL")?;
 
         let writer_conn_conf =
@@ -68,6 +64,10 @@ impl Env {
             sui_node_url,
             initial_seq_num,
         })
+    }
+
+    pub fn is_leader(&self) -> bool {
+        matches!(self.spawned_as, Role::Leader)
     }
 
     pub async fn rpc(&self) -> Result<SuiClient> {
