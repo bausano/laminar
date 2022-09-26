@@ -103,17 +103,27 @@ impl Conf {
         SuiClient::new_rpc_client(&self.sui_node_url, None).await
     }
 
-    pub async fn writer_db(&self) -> Result<DbClient> {
-        let tls = tokio_postgres::NoTls;
-        let (client, conn) =
-            tokio_postgres::connect(&self.writer_conn_conf, tls).await?;
-
-        tokio::spawn(async move {
-            if let Err(e) = conn.await {
-                todo!("handle connection error: {}", e);
-            }
-        });
-
-        Ok(client)
+    pub async fn leader_db(&self) -> Result<DbClient> {
+        db(&self.writer_conn_conf).await
     }
+
+    pub async fn support_db(&self) -> Result<DbClient> {
+        match self.spawned_as {
+            Role::Leader => Err(anyhow!("Not a support node")),
+            Role::Support { ref db_conn_conf } => db(db_conn_conf).await,
+        }
+    }
+}
+
+async fn db(conn_conf: &str) -> Result<DbClient> {
+    let tls = tokio_postgres::NoTls;
+    let (client, conn) = tokio_postgres::connect(conn_conf, tls).await?;
+
+    tokio::spawn(async move {
+        if let Err(e) = conn.await {
+            error!("db connection error: {}", e);
+        }
+    });
+
+    Ok(client)
 }

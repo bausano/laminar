@@ -49,7 +49,7 @@ pub async fn start(
             );
 
             db = conf
-                .writer_db()
+                .leader_db()
                 .await
                 .context("Cannot revive db connection")?;
 

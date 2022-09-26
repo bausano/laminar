@@ -8,10 +8,15 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::time::Instant;
 
+/// Support fetches digests from RPC and db. It verifies the work of the leader
+/// by checking that expected digests are eventually present in db.
+///
+/// If the support observes discrepancy which is not fixed over some period of
+/// time, then it assumes the leader role itself.
 pub async fn start(
     conf: Conf,
     sui: SuiClient,
-    db: DbClient,
+    mut db: DbClient,
     status: Arc<StatusReport>,
 ) -> Result<()> {
     let fetch_from_seqnum =
@@ -27,24 +32,51 @@ pub async fn start(
         VecDeque::with_capacity(rpc_only_digests.capacity());
 
     loop {
+        // OPTIMIZE: measure which of the two is bottleneck, if db we can skip
+        // the call every nth iteration or if there hasn't been anything new
+        // in the past call
         let (db_call, rpc_call) = tokio::join!(
             db::select_digests_since_exclusive(&db, &latest_db_digest),
             rpc::fetch_digests(&sui, fetch_from_seqnum),
         );
 
-        let (fetched_digests_count, chain_digests) = rpc_call?;
+        let (latest_seqnum, new_rpc_digests) = rpc_call?;
 
-        let db_digests = db_call?; // TODO: handle db err
-        if let Some(latest) = db_digests.last().cloned() {
+        // since the state we've built here is valuable, let's attempt to
+        // rebuild the db conn before crashing the service
+        let new_db_digests = match db_call {
+            Ok(new_db_digests) => new_db_digests,
+            Err(db_err) => {
+                warn!(
+                    "Failed to select digests since '{:?}' from db: {}",
+                    latest_db_digest, db_err
+                );
+
+                db = conf
+                    .support_db()
+                    .await
+                    .context("Cannot revive db connection")?;
+
+                db::select_digests_since_exclusive(&db, &latest_db_digest)
+                    .await?
+            }
+        };
+
+        if let Some(latest) = new_db_digests.last().cloned() {
+            // if there are some new digests...
+
             latest_db_digest = latest;
-            db_only_digests.extend(db_digests.into_iter());
+            db_only_digests.extend(new_db_digests.into_iter());
         }
 
-        let latest_seqnum = fetch_from_seqnum + fetched_digests_count;
         for (seqnum, digest) in
-            (fetch_from_seqnum..latest_seqnum).zip(chain_digests)
+            (fetch_from_seqnum..latest_seqnum).zip(new_rpc_digests)
         {
-            if !db_only_digests.remove(&digest) {
+            let is_in_db = db_only_digests.remove(&digest);
+            if !is_in_db {
+                // digest not observed in db, we are yet to see it persisted by
+                // the leader
+
                 rpc_only_digests_timestamps
                     .push_back((Instant::now(), digest.clone()));
                 rpc_only_digests.insert(digest, seqnum);
@@ -72,20 +104,26 @@ pub async fn start(
 
             break;
         } else {
-            let oldest_unconfirmed = rpc_only_digests_timestamps
+            let oldest_unconfirmed_seqnum = rpc_only_digests_timestamps
                 .front()
                 .and_then(|(_, seqnum)| rpc_only_digests.get(seqnum))
                 .copied()
                 .unwrap_or_else(|| latest_seqnum + 1);
             status
                 .next_fetch_from_seqnum
-                .store(oldest_unconfirmed, Ordering::Relaxed);
+                // acts as a counter
+                .store(oldest_unconfirmed_seqnum, Ordering::Relaxed);
         }
 
         // TODO: iterate rpc_only_digests_timestamps if nearing capacity
         // TODO: if rpc_only_digests are reaching capacity, what do we do?
         // TODO: if db_only_digests are reaching capacity, what do we do?
     }
+
+    let db = conf
+        .leader_db()
+        .await
+        .context("Cannot start writer db connection")?;
 
     leader::start(conf, sui, db, status).await
 }

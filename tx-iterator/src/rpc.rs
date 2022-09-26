@@ -3,7 +3,8 @@ use crate::prelude::*;
 use sui_sdk::SuiClient;
 use tokio::time::sleep;
 
-/// Fetches consecutive digests starting from given seq# inclusive.
+/// Fetches consecutive digests starting from given seq# inclusive. Also returns
+/// the seqnum of the latest digest (last in the vec).
 ///
 /// This fn never returns an empty vector, it keeps polling until new digests
 /// are available.
