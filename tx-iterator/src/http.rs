@@ -7,26 +7,29 @@ use std::sync::{
 };
 use warp::Filter;
 
+pub struct StatusReport {
+    pub is_leader: AtomicBool,
+    pub next_fetch_from_seqnum: AtomicU64,
+}
+
 /// Blocking operation which starts http server with paths:
-/// 1. GET /seqnum => prints a number in the body
-/// 2. GET /leader => prints "true"/"false"
+/// 1. GET /leader => prints "true"/"false"
+/// 2. GET /seqnum => prints a number in the body
 ///
 /// # Note
 /// We use [`Ordering::SeqCst`] to read the values are performance here is not
 /// paramount and it's just easier to not have to think about.
-pub async fn start(
-    conf: Conf,
-    next_fetch_from_seqnum: Arc<AtomicU64>,
-    is_leader: Arc<AtomicBool>,
-) {
+pub async fn start(conf: Conf, status: Arc<StatusReport>) {
     // 1.
-    let seqnum = warp::path("seqnum").map(move || {
-        format!("{}", next_fetch_from_seqnum.load(Ordering::SeqCst))
+    let status_prime = Arc::clone(&status);
+    let leader = warp::path("leader").map(move || {
+        format!("{}", status_prime.is_leader.load(Ordering::SeqCst))
     });
 
     // 2.
-    let leader = warp::path("leader")
-        .map(move || format!("{}", is_leader.load(Ordering::SeqCst)));
+    let seqnum = warp::path("seqnum").map(move || {
+        format!("{}", status.next_fetch_from_seqnum.load(Ordering::SeqCst))
+    });
 
     let routes = warp::get().and(seqnum.or(leader));
 

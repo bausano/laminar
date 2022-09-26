@@ -1,6 +1,7 @@
+use crate::http::StatusReport;
 use crate::prelude::*;
 use crate::{db, rpc};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 /// Starts polling RPC for new digests and persists them into db.
@@ -17,7 +18,7 @@ pub async fn start(
     conf: Conf,
     sui: SuiClient,
     mut db: DbClient,
-    a_next_fetch_from_seqnum: Arc<AtomicU64>,
+    status: Arc<StatusReport>,
 ) -> Result<()> {
     // fetches the first batch and from here on the loop writes to these two
     // variables
@@ -27,7 +28,7 @@ pub async fn start(
         &sui,
         // since this operation happens only once on boot, it's easier not
         // having to think about ordering
-        a_next_fetch_from_seqnum.load(Ordering::SeqCst),
+        status.next_fetch_from_seqnum.load(Ordering::SeqCst),
     )
     .await?;
 
@@ -68,16 +69,15 @@ pub async fn start(
         // these digests are persisted in the next loop iteration
         digests = next_digests;
 
-        let next_fetch_from_seqnum = next_largest_seqnum
-            // next iteration should not be inclusive
-            .checked_add(1)
-            .expect("seq# out of u64 bounds");
+        // next iteration should not be inclusive
+        let next_fetch_from_seqnum = next_largest_seqnum + 1;
         fetch_from_seqnum = next_fetch_from_seqnum;
 
         // we communicate this way with the http server
         // we relax because we don't read it in the context of this thread, it's
         // effectively like a counter
-        a_next_fetch_from_seqnum
+        status
+            .next_fetch_from_seqnum
             .store(next_fetch_from_seqnum, Ordering::Relaxed);
     }
 }

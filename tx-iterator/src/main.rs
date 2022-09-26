@@ -24,6 +24,8 @@ use conf::Conf;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    dotenv::dotenv().ok();
+
     env_logger::init(); // set up with env RUST_LOG
 
     let conf = Conf::from_env()?;
@@ -33,21 +35,20 @@ async fn main() -> Result<()> {
 
     // prepares some state which is shared with the http server to allow
     // supervisor to inspect what's going on
-    let start_iterating_from_seqnum =
-        boot::find_seqnum_to_start_iterating_from(&db, &sui).await?;
-    let is_leader = Arc::new(AtomicBool::new(conf.is_leader()));
+    let status = Arc::new(http::StatusReport {
+        is_leader: AtomicBool::new(conf.is_leader()),
+        next_fetch_from_seqnum: boot::find_seqnum_to_start_iterating_from(
+            &db, &sui,
+        )
+        .await?,
+    });
 
     // run the http server in another task
-    tokio::spawn(http::start(
-        conf.clone(),
-        Arc::clone(&start_iterating_from_seqnum),
-        Arc::clone(&is_leader),
-    ));
+    tokio::spawn(http::start(conf.clone(), Arc::clone(&status)));
 
     if conf.is_leader() {
-        leader::start(conf, sui, db, start_iterating_from_seqnum).await
+        leader::start(conf, sui, db, status).await
     } else {
-        support::start(conf, sui, db, start_iterating_from_seqnum, is_leader)
-            .await
+        support::start(conf, sui, db, status).await
     }
 }

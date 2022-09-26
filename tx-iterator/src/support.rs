@@ -1,10 +1,10 @@
 use crate::db;
+use crate::http::StatusReport;
 use crate::leader;
 use crate::prelude::*;
 use crate::rpc;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::time::Instant;
 
@@ -12,10 +12,10 @@ pub async fn start(
     conf: Conf,
     sui: SuiClient,
     db: DbClient,
-    a_next_fetch_from_seqnum: Arc<AtomicU64>,
-    a_is_leader: Arc<AtomicBool>,
+    status: Arc<StatusReport>,
 ) -> Result<()> {
-    let fetch_from_seqnum = a_next_fetch_from_seqnum.load(Ordering::SeqCst);
+    let fetch_from_seqnum =
+        status.next_fetch_from_seqnum.load(Ordering::SeqCst);
 
     let (mut latest_db_digest, db_only_digests) =
         initial_db_digests(&sui, &db, fetch_from_seqnum).await?;
@@ -65,8 +65,10 @@ pub async fn start(
 
             // this is a one-time occurrence, no need for optimization
             let o = Ordering::SeqCst;
-            a_next_fetch_from_seqnum.store(start_leader_from_seqnum, o);
-            a_is_leader.store(true, o);
+            status
+                .next_fetch_from_seqnum
+                .store(start_leader_from_seqnum, o);
+            status.is_leader.store(true, o);
 
             break;
         } else {
@@ -74,16 +76,18 @@ pub async fn start(
                 .front()
                 .and_then(|(_, seqnum)| rpc_only_digests.get(seqnum))
                 .copied()
-                // TODO: panic on overflow
                 .unwrap_or_else(|| latest_seqnum + 1);
-            a_next_fetch_from_seqnum
+            status
+                .next_fetch_from_seqnum
                 .store(oldest_unconfirmed, Ordering::Relaxed);
         }
 
-        // TODO iterate rpc_only_digests_timestamps if nearing capacity
+        // TODO: iterate rpc_only_digests_timestamps if nearing capacity
+        // TODO: if rpc_only_digests are reaching capacity, what do we do?
+        // TODO: if db_only_digests are reaching capacity, what do we do?
     }
 
-    leader::start(conf, sui, db, a_next_fetch_from_seqnum).await
+    leader::start(conf, sui, db, status).await
 }
 
 enum Promote {

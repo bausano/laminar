@@ -7,7 +7,6 @@
 use crate::conf::Role;
 use crate::prelude::*;
 use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
 
 impl Conf {
     /// The connection that was passed from env.
@@ -43,7 +42,7 @@ impl Conf {
 pub async fn find_seqnum_to_start_iterating_from(
     _db: &DbClient,
     sui: &SuiClient,
-) -> Result<Arc<AtomicU64>> {
+) -> Result<AtomicU64> {
     // TODO: when appropriate, start fetching from last db transaction.
     // However, atm Sui SDK does not provide us with any way to map digest to
     // the seq#
@@ -69,5 +68,5 @@ pub async fn find_seqnum_to_start_iterating_from(
             sui.read_api().get_total_transaction_number().await?
         };
 
-    Ok(Arc::new(AtomicU64::new(start_iterating_from_seqnum)))
+    Ok(AtomicU64::new(start_iterating_from_seqnum))
 }

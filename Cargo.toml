@@ -2,3 +2,6 @@
 members = [
     "tx-iterator"
 ]
+
+[profile.release]
+overflow-checks = true
