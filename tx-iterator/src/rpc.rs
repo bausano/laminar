@@ -3,7 +3,7 @@ use crate::prelude::*;
 use sui_sdk::SuiClient;
 use tokio::time::sleep;
 
-/// Fetches digests from given seq# inclusive.
+/// Fetches consecutive digests starting from given seq# inclusive.
 ///
 /// This fn never returns an empty vector, it keeps polling until new digests
 /// are available.
@@ -38,4 +38,23 @@ pub async fn fetch_digests(
             sleep(consts::SLEEP_ON_NO_NEW_TXS).await;
         };
     }
+}
+
+/// Gets the most recent tx's digest.
+pub async fn latest_digest(sui: &SuiClient) -> Result<Digest> {
+    let txs = retry_rpc(|| sui.read_api().get_recent_transactions(1)).await?;
+
+    txs.into_iter()
+        .next()
+        .map(|(_, digest)| digest.to_bytes())
+        .ok_or_else(|| anyhow!("There are no txs known to the node yet"))
+}
+
+/// Returns digest of tx with given seqnum.
+pub async fn digest(sui: &SuiClient, seqnum: SeqNum) -> Result<Option<Digest>> {
+    let txs =
+        retry_rpc(|| sui.read_api().get_transactions_in_range(seqnum, seqnum))
+            .await?;
+
+    Ok(txs.into_iter().next().map(|(_, digest)| digest.to_bytes()))
 }

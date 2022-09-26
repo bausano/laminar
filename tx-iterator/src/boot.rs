@@ -4,7 +4,7 @@
 //! Then it needs to determine which seq# to start iterating from -
 //! [`find_seqnum_to_start_iterating_from`].
 
-use crate::conf::{Conf, Role};
+use crate::conf::Role;
 use crate::prelude::*;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;

@@ -47,6 +47,7 @@ async fn main() -> Result<()> {
     if conf.is_leader() {
         leader::start(conf, sui, db, start_iterating_from_seqnum).await
     } else {
-        support::start().await
+        support::start(conf, sui, db, start_iterating_from_seqnum, is_leader)
+            .await
     }
 }

@@ -2,13 +2,80 @@
 
 use crate::prelude::*;
 use itertools::Itertools;
+use std::ops::Not;
+
+enum Clusivity {
+    Inclusive,
+    Exclusive,
+}
+
+pub async fn select_digests_since_exclusive(
+    db: &DbClient,
+    digest: &Digest,
+) -> Result<Vec<Digest>> {
+    select_digests_since(db, digest, Clusivity::Exclusive).await
+}
+
+pub async fn select_digests_since_inclusive(
+    db: &DbClient,
+    digest: &Digest,
+) -> Result<Vec<Digest>> {
+    select_digests_since(db, digest, Clusivity::Inclusive).await
+}
+
+async fn select_digests_since(
+    db: &DbClient,
+    digest: &Digest,
+    clusivity: Clusivity,
+) -> Result<Vec<Digest>> {
+    // TODO: prepare this statement? with lazy load?
+    let statement = format!(
+        "SELECT
+            digest
+        FROM
+            txs
+        WHERE id {} (SELECT id FROM txs WHERE digest = ?)
+        ORDER BY
+            id
+        ASC LIMIT {}",
+        if matches!(clusivity, Clusivity::Inclusive) {
+            ">="
+        } else {
+            ">"
+        },
+        consts::QUERY_TX_DIGESTS_BATCH,
+    );
+
+    let rows = db
+        .query(&statement, &[digest])
+        .await
+        .with_context(|| format!("Cannot select digests since {:?}", digest))?;
+
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            row.try_get::<_, Vec<u8>>("digest")
+                .expect("No column 'digest' in 'txs' table")
+        })
+        .collect())
+}
+
+pub async fn has_digest(db: &DbClient, digest: &Digest) -> Result<bool> {
+    Ok(db
+        .query("SELECT id FROM txs WHERE digest = ?", &[digest])
+        .await?
+        .is_empty()
+        .not())
+}
 
 /// Batch inserts digests in given order. On conflict (digests must be unique)
 /// it skips given digest.
 pub async fn insert_digests(db: &DbClient, digests: &[Digest]) -> Result<()> {
     let query = insert_digest_query(digests.len());
 
-    db.execute_raw(&query, digests).await?;
+    db.execute_raw(&query, digests)
+        .await
+        .context("Cannot insert digests")?;
 
     Ok(())
 }

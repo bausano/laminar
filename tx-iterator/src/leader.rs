@@ -1,4 +1,3 @@
-use crate::conf::Conf;
 use crate::prelude::*;
 use crate::{db, rpc};
 use std::sync::atomic::{AtomicU64, Ordering};

@@ -1,6 +1,6 @@
 //! HTTP server is used by supervisor to inspect tx-iterator inner state.
 
-use crate::conf::Conf;
+use crate::prelude::*;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,

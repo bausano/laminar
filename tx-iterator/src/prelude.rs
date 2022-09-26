@@ -1,5 +1,5 @@
-pub use crate::conf::consts;
-pub use anyhow::{bail, Context, Result};
+pub use crate::conf::{consts, Conf};
+pub use anyhow::{anyhow, bail, Context, Result};
 pub use log::{error, warn};
 pub use sui_sdk::rpc_types::GatewayTxSeqNumber as SeqNum;
 pub use sui_sdk::SuiClient;

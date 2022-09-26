@@ -7,11 +7,18 @@ pub mod consts {
     /// How many digests are fetched from RPC in each call and then persisted to
     /// the db.
     /// OPTIMIZE:
-    pub const FETCH_TX_DIGESTS_BATCH: u64 = 100;
+    pub const FETCH_TX_DIGESTS_BATCH: u64 = 128;
+
+    /// How many digests are fetched from db in each select.
+    pub const QUERY_TX_DIGESTS_BATCH: u64 = 1_024;
 
     /// Unlikely to be useful once Sui is adopted, but in case the network is
     /// idle, how long to wait for next poll.
     pub const SLEEP_ON_NO_NEW_TXS: Duration = Duration::from_millis(5);
+
+    /// TODO: load this from env, set interval for services based on the nodes
+    pub const INVESTIGATE_IF_TX_ONLY_OBSERVED_ON_RPC_FOR: Duration =
+        Duration::from_secs(30);
 }
 
 #[derive(Clone, Debug)]
