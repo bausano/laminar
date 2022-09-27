@@ -1,3 +1,17 @@
+//! Support keeps fetching digests from two sources: _(i)_ RPC node and _(ii)_
+//! db.
+//!
+//! The leader node writes to db as it iterates txs over its node.
+//!
+//! Support cross-validates txs with its own node's.
+//! If leader goes down then support is promoted to leader.
+//!
+//! We keep the state in following three structures:
+//! 1. hashset of db digests not yet observed on RPC
+//! 2. hashmap of RPC digests to seqnums not yet observed in db
+//! 3. FIFO queue of RPC digests with timestamp of when we observed them. This
+//! is always a subset of the hashmap 2.
+
 use crate::db;
 use crate::http::StatusReport;
 use crate::leader;
@@ -22,12 +36,17 @@ pub async fn start(
     let fetch_from_seqnum =
         status.next_fetch_from_seqnum.load(Ordering::SeqCst);
 
-    let (mut latest_db_digest, db_only_digests) =
+    // latest_db_digest will be mutated in the loop
+    let (mut latest_db_digest, initial_db_only_digests) =
         initial_db_digests(&sui, &db, fetch_from_seqnum).await?;
 
-    let mut db_only_digests: HashSet<_> = db_only_digests.into_iter().collect();
+    // 1. hashset of db digests not yet observed on RPC
+    let mut db_only_digests: HashSet<_> =
+        initial_db_only_digests.into_iter().collect();
+    // 2. hashmap of RPC digests to seqnums not yet observed in db
     let mut rpc_only_digests =
         HashMap::with_capacity(consts::FETCH_TX_DIGESTS_BATCH as usize * 4);
+    // 3. FIFO queue of RPC digests with timestamp of when we observed them
     let mut rpc_only_digests_timestamps =
         VecDeque::with_capacity(rpc_only_digests.capacity());
 
@@ -42,25 +61,13 @@ pub async fn start(
 
         let (latest_seqnum, new_rpc_digests) = rpc_call?;
 
-        // since the state we've built here is valuable, let's attempt to
-        // rebuild the db conn before crashing the service
-        let new_db_digests = match db_call {
-            Ok(new_db_digests) => new_db_digests,
-            Err(db_err) => {
-                warn!(
-                    "Failed to select digests since '{:?}' from db: {}",
-                    latest_db_digest, db_err
-                );
-
-                db = conf
-                    .support_db()
-                    .await
-                    .context("Cannot revive db connection")?;
-
-                db::select_digests_since_exclusive(&db, &latest_db_digest)
-                    .await?
-            }
-        };
+        let new_db_digests = retry_db_conn_on_err_in_select_digests(
+            &conf,
+            &mut db,
+            &latest_db_digest,
+            db_call,
+        )
+        .await?;
 
         if let Some(latest) = new_db_digests.last().cloned() {
             // if there are some new digests...
@@ -86,6 +93,7 @@ pub async fn start(
         if let Promote::Yes {
             start_leader_from_seqnum,
         } = pop_observed_digests(
+            &conf,
             &db,
             &mut rpc_only_digests,
             &mut rpc_only_digests_timestamps,
@@ -115,15 +123,54 @@ pub async fn start(
                 .store(oldest_unconfirmed_seqnum, Ordering::Relaxed);
         }
 
-        // TODO: iterate rpc_only_digests_timestamps if nearing capacity
+        // TODO: clean up rpc_only_digests_timestamps if nearing capacity
         // TODO: if rpc_only_digests are reaching capacity, what do we do?
         // TODO: if db_only_digests are reaching capacity, what do we do?
     }
 
+    // explicit drop bcs next logic might allocate new memory and if we got here
+    // then it's likely that our data structure grew large, so avoid OOM
+    info!(
+        "Promoting support of node '{}' to leader. It had stored {} db digests.",
+        conf.sui_node_url,
+        db_only_digests.len()
+    );
+    drop(db_only_digests);
+
+    // promote db collection
     let db = conf
         .leader_db()
         .await
         .context("Cannot start writer db connection")?;
+
+    // iterate rpc_only_digests_timestamps and insert that to db
+    // in the same order those which are not there yet according to our state
+    let digests_not_observed_in_db: Vec<_> = rpc_only_digests_timestamps
+        .into_iter()
+        .filter(|(_, digest)| rpc_only_digests.contains_key(digest))
+        .map(|(_, digest)| digest)
+        .collect();
+    if let Some(latest_digest) = digests_not_observed_in_db.first() {
+        info!(
+            "There have been {} digests observed on RPC \
+            but not in db starting with '{:?}'. Inserting them into db.",
+            digests_not_observed_in_db.len(),
+            latest_digest
+        );
+
+        let latest_seqnum =
+            rpc_only_digests.get(latest_digest).copied().unwrap();
+
+        db::insert_digests(&db, &digests_not_observed_in_db)
+            .await
+            .context("Cannot insert remaining db-unobserved digests")?;
+
+        // we've observed all txs up until the last one, we start from the next
+        // one
+        status
+            .next_fetch_from_seqnum
+            .store(latest_seqnum + 1, Ordering::SeqCst);
+    }
 
     leader::start(conf, sui, db, status).await
 }
@@ -140,6 +187,7 @@ enum Promote {
 /// [`consts::INVESTIGATE_IF_TX_ONLY_OBSERVED_ON_RPC_FOR`] to add txs to the db,
 /// begin procedure to become a leader.
 async fn pop_observed_digests(
+    conf: &Conf,
     db: &DbClient,
     rpc_only_digests: &mut HashMap<Digest, SeqNum>,
     rpc_only_digests_timestamps: &mut VecDeque<(Instant, Digest)>,
@@ -150,7 +198,7 @@ async fn pop_observed_digests(
 
             rpc_only_digests_timestamps.pop_front();
         } else if Instant::now().duration_since(*timestamp)
-            > consts::INVESTIGATE_IF_TX_ONLY_OBSERVED_ON_RPC_FOR
+            > conf.investigate_if_tx_only_observed_on_rpc_for
         {
             if db::has_digest(&db, digest).await? {
                 // this is an unlikely but conceivable scenario:
@@ -215,4 +263,32 @@ async fn initial_db_digests(
         db_only_digests.last().cloned().unwrap_or(fetch_from_digest);
 
     Ok((latest_db_digest, db_only_digests))
+}
+
+/// Since the state we've built here is valuable, let's attempt to
+/// rebuild the db conn before crashing the service.
+async fn retry_db_conn_on_err_in_select_digests(
+    conf: &Conf,
+    db: &mut DbClient,
+    latest_db_digest: &Digest,
+    db_call: Result<Vec<Digest>>,
+) -> Result<Vec<Digest>> {
+    // since the state we've built here is valuable, let's attempt to
+    // rebuild the db conn before crashing the service
+    match db_call {
+        ok @ Ok(_) => ok,
+        Err(db_err) => {
+            warn!(
+                "Failed to select digests since '{:?}' from db: {}",
+                latest_db_digest, db_err
+            );
+
+            *db = conf
+                .support_db()
+                .await
+                .context("Cannot revive db connection")?;
+
+            db::select_digests_since_exclusive(db, latest_db_digest).await
+        }
+    }
 }

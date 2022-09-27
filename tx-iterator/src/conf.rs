@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use std::{env, net::SocketAddr};
+use tokio::time::Duration;
 
 pub mod consts {
     use tokio::time::Duration;
@@ -16,9 +17,13 @@ pub mod consts {
     /// idle, how long to wait for next poll.
     pub const SLEEP_ON_NO_NEW_TXS: Duration = Duration::from_millis(5);
 
-    /// TODO: load this from env, set interval for services based on the nodes
-    pub const INVESTIGATE_IF_TX_ONLY_OBSERVED_ON_RPC_FOR: Duration =
-        Duration::from_secs(30);
+    pub mod defaults {
+        use super::*;
+
+        /// See [`crate::conf::Conf::investigate_if_tx_only_observed_on_rpc_for`].
+        pub const INVESTIGATE_IF_TX_ONLY_OBSERVED_ON_RPC_FOR: Duration =
+            Duration::from_secs(30);
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -59,11 +64,24 @@ pub struct Conf {
     /// What's the address that the http status server should bound to.
     /// Defaults to "127.0.0.1:80"
     pub http_addr: SocketAddr,
+    /// If a tx was observed on RPC but not in database for longer than this
+    /// duration, then a support node promotes itself to a leader.
+    ///
+    /// We call it "investigate" because it's not guaranteed that this timeout
+    /// will lead to promotion to leader. See [`pop_observed_digests`].
+    ///
+    /// Defaults to
+    /// [`consts::defaults::INVESTIGATE_IF_TX_ONLY_OBSERVED_ON_RPC_FOR`].
+    ///
+    /// # Note
+    /// This settings is irrelevant for leader node.
+    pub investigate_if_tx_only_observed_on_rpc_for: Duration,
 }
 
 impl Conf {
     pub fn from_env() -> Result<Self> {
         let sui_node_url = env::var("SUI_NODE_URL").context("Sui Node URL")?;
+        info!("RPC url: {}", sui_node_url);
 
         let writer_conn_conf =
             env::var("WRITER_CONN_CONF").context("Writer DB URL")?;
@@ -75,8 +93,10 @@ impl Conf {
 
         let role =
             if let Some(db_conn_conf) = env::var("SUPPORT_CONN_CONF").ok() {
+                info!("Spawned as support");
                 Role::Support { db_conn_conf }
             } else {
+                info!("Spawned as leader");
                 Role::Leader
             };
 
@@ -85,11 +105,28 @@ impl Conf {
             .map(|s| s.parse::<SeqNum>())
             .transpose()
             .context("Initial seq#")?;
+        info!("Env initial seq#: {:?}", initial_seq_num);
+
+        let investigate_if_tx_only_observed_on_rpc_for = env::var(
+            "INVESTIGATE_IF_TX_ONLY_OBSERVED_ON_RPC_FOR_SECONDS",
+        )
+        .ok()
+        .map(|s| s.parse::<u64>())
+        .transpose()?
+        .map(Duration::from_secs)
+        .unwrap_or(
+            consts::defaults::INVESTIGATE_IF_TX_ONLY_OBSERVED_ON_RPC_FOR,
+        );
+        info!(
+            "Investigate state after {:?}",
+            investigate_if_tx_only_observed_on_rpc_for
+        );
 
         Ok(Self {
             spawned_as: role,
             writer_conn_conf,
             sui_node_url,
+            investigate_if_tx_only_observed_on_rpc_for,
             http_addr,
             initial_seq_num,
         })

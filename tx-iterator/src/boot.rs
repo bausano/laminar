@@ -28,7 +28,7 @@ impl Conf {
 
         tokio::spawn(async move {
             if let Err(e) = conn.await {
-                todo!("handle connection error: {}", e);
+                error!("booted db connection error: {}", e);
             }
         });
 
@@ -40,33 +40,37 @@ impl Conf {
 /// We use atomic to share information about where the tx-iterator currently is
 /// with http server which runs in this service. This is used by supervisor.
 pub async fn find_seqnum_to_start_iterating_from(
+    conf: &Conf,
     _db: &DbClient,
     sui: &SuiClient,
 ) -> Result<AtomicU64> {
-    // TODO: when appropriate, start fetching from last db transaction.
-    // However, atm Sui SDK does not provide us with any way to map digest to
-    // the seq#
-    // TODO: Move to db.rs module
-    // https://discord.com/channels/916379725201563759/1006322742620069898/1023675518001872940
-    // let latest_db_digest: Option<String> = db
-    //     .query("SELECT digest FROM txs ORDER BY id LIMIT 1", &[])
-    //     .await?
-    //     .first()
-    //     .map(|row| {
-    //         row.try_get("digest")
-    //             .context("Cannot find column 'digest' on tx")
-    //     })
-    //     .transpose()?;
-    let latest_db_digest = None::<String>;
+    let start_iterating_from_seqnum = if let Some(seqnum) = conf.initial_seq_num
+    {
+        seqnum
+    } else {
+        // TODO: when appropriate, start fetching from last db transaction.
+        // However, atm Sui SDK does not provide us with any way to map digest
+        // to the seq# - impl that in db.rs module
+        // https://discord.com/channels/916379725201563759/1006322742620069898/1023675518001872940
+        // let latest_db_digest: Option<String> = db
+        //     .query("SELECT digest FROM txs ORDER BY id LIMIT 1", &[])
+        //     .await?
+        //     .first()
+        //     .map(|row| {
+        //         row.try_get("digest")
+        //             .context("Cannot find column 'digest' on tx")
+        //     })
+        //     .transpose()?;
+        let latest_db_digest = None::<String>;
 
-    let start_iterating_from_seqnum =
         if let Some(_latest_db_digest) = latest_db_digest {
             unimplemented!(
                 "Sui SDK does not yet support mapping from digest to seq#"
             );
         } else {
             sui.read_api().get_total_transaction_number().await?
-        };
+        }
+    };
 
     Ok(AtomicU64::new(start_iterating_from_seqnum))
 }

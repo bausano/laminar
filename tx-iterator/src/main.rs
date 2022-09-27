@@ -38,12 +38,11 @@ async fn main() -> Result<()> {
     let status = Arc::new(http::StatusReport {
         is_leader: AtomicBool::new(conf.is_leader()),
         next_fetch_from_seqnum: boot::find_seqnum_to_start_iterating_from(
-            &db, &sui,
+            &conf, &db, &sui,
         )
         .await?,
     });
 
-    // run the http server in another task
     tokio::spawn(http::start(conf.clone(), Arc::clone(&status)));
 
     if conf.is_leader() {

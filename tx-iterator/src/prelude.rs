@@ -1,6 +1,6 @@
 pub use crate::conf::{consts, Conf};
 pub use anyhow::{anyhow, bail, Context, Result};
-pub use log::{error, warn};
+pub use log::{error, info, warn};
 pub use sui_sdk::rpc_types::GatewayTxSeqNumber as SeqNum;
 pub use sui_sdk::SuiClient;
 pub use tokio_postgres::Client as DbClient;
