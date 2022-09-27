@@ -160,7 +160,10 @@ pub async fn start(
 
         let latest_seqnum =
             rpc_only_digests.get(latest_digest).copied().unwrap();
+        drop(rpc_only_digests); // same reason as drop above
 
+        // TODO: could `digests_not_observed_in_db` be too large one time
+        // insert?
         db::insert_digests(&db, &digests_not_observed_in_db)
             .await
             .context("Cannot insert remaining db-unobserved digests")?;
