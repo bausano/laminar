@@ -8,5 +8,5 @@ Each node has its own ordering when it publishes a broadcast transaction.
 If a node crashes, failing over to another without losing transaction
 information is a non-trivial challenge.
 
-_Laminar_ aims to solve this problem with fault-tolerant distributed
+_Laminar_ aims to solve this problem with a fault-tolerant distributed
 architecture.
