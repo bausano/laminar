@@ -17,10 +17,9 @@ mod support;
 // Exports http server for service status and control
 mod http;
 
-use std::sync::{atomic::AtomicBool, Arc};
-
 use crate::prelude::*;
 use conf::Conf;
+use std::sync::{atomic::AtomicBool, Arc};
 
 #[tokio::main]
 async fn main() -> Result<()> {
