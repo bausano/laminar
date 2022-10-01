@@ -1,15 +1,15 @@
+// Ubiquitously used types
+mod prelude;
 // Methods relevant for startup
 mod boot;
 // Service configuration from env
 mod conf;
-// Polling and persisting digests
-mod leader;
-// Ubiquitously used types
-mod prelude;
-// Polling digests from RPC and db, validating them
-mod support;
 // Exports http server for service status and control
 mod http;
+// Polling and persisting digests
+mod leader;
+// Polling digests from RPC and db, validating them
+mod support;
 
 use crate::prelude::*;
 use conf::Conf;
