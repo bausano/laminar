@@ -1,16 +1,14 @@
-use crate::prelude::*;
+//! Contains various ubiquitously used constructs.
+
+pub use sui_sdk::rpc_types::GatewayTxSeqNumber as SeqNum;
+
+/// A digest is [u8; 32] but this type is more convenient to work with in the
+/// context of db query params.
+pub type Digest = Vec<u8>;
+
+use anyhow::Result;
 use futures::Future;
 use tokio::time::{sleep, Duration};
-
-pub async fn retry_rpc<T, F>(job: impl FnMut() -> F) -> Result<T>
-where
-    F: Future<Output = Result<T>>,
-{
-    // 1st retry after 10ms
-    // 2nd retry after 100ms
-    // 3rd retry after 1s
-    retry(job, 3, 10, 10).await
-}
 
 pub async fn retry<T, F>(
     mut job: impl FnMut() -> F,

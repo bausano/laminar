@@ -1,6 +1,9 @@
 [workspace]
 members = [
-    "tx-iterator"
+    "db",
+    "misc",
+    "rpc",
+    "tx-iterator",
 ]
 
 [profile.release]

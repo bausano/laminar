@@ -1,32 +1,36 @@
-//! Wraps around database queries performed by the tx-iterators.
+//! Wraps around database queries.
 
-use crate::prelude::*;
+use anyhow::{Context, Result};
 use itertools::Itertools;
+use misc::Digest;
 use std::ops::Not;
-
+use tokio_postgres::Client as DbClient;
 enum Clusivity {
-    Inclusive,
-    Exclusive,
+    In,
+    Ex,
 }
 
 pub async fn select_digests_since_exclusive(
     db: &DbClient,
     digest: &Digest,
+    limit: usize,
 ) -> Result<Vec<Digest>> {
-    select_digests_since(db, digest, Clusivity::Exclusive).await
+    select_digests_since(db, digest, Clusivity::Ex, limit).await
 }
 
 pub async fn select_digests_since_inclusive(
     db: &DbClient,
     digest: &Digest,
+    limit: usize,
 ) -> Result<Vec<Digest>> {
-    select_digests_since(db, digest, Clusivity::Inclusive).await
+    select_digests_since(db, digest, Clusivity::In, limit).await
 }
 
 async fn select_digests_since(
     db: &DbClient,
     digest: &Digest,
     clusivity: Clusivity,
+    limit: usize,
 ) -> Result<Vec<Digest>> {
     // TODO: prepare this statement? with lazy load?
     let statement = format!(
@@ -38,12 +42,12 @@ async fn select_digests_since(
         ORDER BY
             id
         ASC LIMIT {}",
-        if matches!(clusivity, Clusivity::Inclusive) {
+        if matches!(clusivity, Clusivity::In) {
             ">="
         } else {
             ">"
         },
-        consts::QUERY_TX_DIGESTS_BATCH,
+        limit
     );
 
     let rows = db

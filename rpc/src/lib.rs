@@ -1,7 +1,12 @@
-use crate::helpers::retry_rpc;
-use crate::prelude::*;
+use anyhow::{anyhow, Result};
+use futures::Future;
+use misc::{Digest, SeqNum};
 use sui_sdk::SuiClient;
-use tokio::time::sleep;
+use tokio::time::{sleep, Duration};
+
+/// Unlikely to be useful once Sui is adopted, but in case the network is
+/// idle, how long to wait for next poll.
+const SLEEP_ON_NO_NEW_TXS: Duration = Duration::from_millis(5);
 
 /// Fetches consecutive digests starting from given seq# inclusive. Also returns
 /// the seqnum of the latest digest (last in the vec).
@@ -14,8 +19,9 @@ use tokio::time::sleep;
 pub async fn fetch_digests(
     sui: &SuiClient,
     start_from_seqnum: SeqNum,
+    limit: usize,
 ) -> Result<(SeqNum, Vec<Digest>)> {
-    let fetch_until_seqnum = start_from_seqnum + consts::FETCH_TX_DIGESTS_BATCH;
+    let fetch_until_seqnum = start_from_seqnum + limit as u64;
 
     loop {
         let txs = retry_rpc(move || {
@@ -36,7 +42,7 @@ pub async fn fetch_digests(
                     .collect(),
             ));
         } else {
-            sleep(consts::SLEEP_ON_NO_NEW_TXS).await;
+            sleep(SLEEP_ON_NO_NEW_TXS).await;
         };
     }
 }
@@ -58,4 +64,14 @@ pub async fn digest(sui: &SuiClient, seqnum: SeqNum) -> Result<Option<Digest>> {
             .await?;
 
     Ok(txs.into_iter().next().map(|(_, digest)| digest.to_bytes()))
+}
+
+async fn retry_rpc<T, F>(job: impl FnMut() -> F) -> Result<T>
+where
+    F: Future<Output = Result<T>>,
+{
+    // 1st retry after 10ms
+    // 2nd retry after 100ms
+    // 3rd retry after 1s
+    misc::retry(job, 3, 10, 10).await
 }

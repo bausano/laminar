@@ -8,14 +8,10 @@ pub mod consts {
     /// How many digests are fetched from RPC in each call and then persisted to
     /// the db.
     /// OPTIMIZE:
-    pub const FETCH_TX_DIGESTS_BATCH: u64 = 128;
+    pub const FETCH_TX_DIGESTS_BATCH: usize = 128;
 
     /// How many digests are fetched from db in each select.
-    pub const QUERY_TX_DIGESTS_BATCH: u64 = 1_024;
-
-    /// Unlikely to be useful once Sui is adopted, but in case the network is
-    /// idle, how long to wait for next poll.
-    pub const SLEEP_ON_NO_NEW_TXS: Duration = Duration::from_millis(5);
+    pub const QUERY_TX_DIGESTS_BATCH: usize = 1_024;
 
     pub mod defaults {
         use super::*;

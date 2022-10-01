@@ -1630,6 +1630,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "db"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "itertools",
+ "misc",
+ "tokio-postgres",
+]
+
+[[package]]
 name = "debug-ignore"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3545,6 +3555,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9f1c5b025cda876f66ef43a113f91ebc9f4ccef34843000e0adf6ebbab84e21"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "misc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "sui-sdk",
+ "tokio",
 ]
 
 [[package]]
@@ -6000,6 +6020,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rpc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "misc",
+ "sui-sdk",
+ "tokio",
+]
+
+[[package]]
 name = "rust-ini"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8354,11 +8385,13 @@ name = "tx-iterator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "db",
  "dotenv",
  "env_logger",
  "futures",
- "itertools",
  "log",
+ "misc",
+ "rpc",
  "sui-sdk",
  "tokio",
  "tokio-postgres",

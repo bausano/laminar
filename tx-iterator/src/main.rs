@@ -2,16 +2,10 @@
 mod boot;
 // Service configuration from env
 mod conf;
-// Wraps around db calls
-mod db;
-// TODO: export to another workspace member
-mod helpers;
 // Polling and persisting digests
 mod leader;
 // Ubiquitously used types
 mod prelude;
-// Fetching txs from gateway
-mod rpc;
 // Polling digests from RPC and db, validating them
 mod support;
 // Exports http server for service status and control

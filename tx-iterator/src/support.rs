@@ -12,11 +12,9 @@
 //! 3. FIFO queue of RPC digests with timestamp of when we observed them. This
 //! is always a subset of the hashmap 2.
 
-use crate::db;
 use crate::http::StatusReport;
 use crate::leader;
 use crate::prelude::*;
-use crate::rpc;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -55,19 +53,20 @@ pub async fn start(
         // the call every nth iteration or if there hasn't been anything new
         // in the past call
         let (db_call, rpc_call) = tokio::join!(
-            db::select_digests_since_exclusive(&db, &latest_db_digest),
-            rpc::fetch_digests(&sui, fetch_from_seqnum),
+            select_digests_since_exclusive_with_retry(
+                &conf,
+                &mut db,
+                &latest_db_digest,
+            ),
+            rpc::fetch_digests(
+                &sui,
+                fetch_from_seqnum,
+                consts::FETCH_TX_DIGESTS_BATCH
+            ),
         );
 
+        let new_db_digests = db_call?;
         let (latest_seqnum, new_rpc_digests) = rpc_call?;
-
-        let new_db_digests = retry_db_conn_on_err_in_select_digests(
-            &conf,
-            &mut db,
-            &latest_db_digest,
-            db_call,
-        )
-        .await?;
 
         if let Some(latest) = new_db_digests.last().cloned() {
             // if there are some new digests...
@@ -259,8 +258,12 @@ async fn initial_db_digests(
             rpc::latest_digest(&sui).await?
         };
 
-    let db_only_digests =
-        db::select_digests_since_inclusive(&db, &fetch_from_digest).await?;
+    let db_only_digests = db::select_digests_since_inclusive(
+        &db,
+        &fetch_from_digest,
+        consts::QUERY_TX_DIGESTS_BATCH,
+    )
+    .await?;
 
     let latest_db_digest =
         db_only_digests.last().cloned().unwrap_or(fetch_from_digest);
@@ -270,12 +273,18 @@ async fn initial_db_digests(
 
 /// Since the state we've built here is valuable, let's attempt to
 /// rebuild the db conn before crashing the service.
-async fn retry_db_conn_on_err_in_select_digests(
+async fn select_digests_since_exclusive_with_retry(
     conf: &Conf,
     db: &mut DbClient,
     latest_db_digest: &Digest,
-    db_call: Result<Vec<Digest>>,
 ) -> Result<Vec<Digest>> {
+    let db_call = db::select_digests_since_exclusive(
+        &db,
+        &latest_db_digest,
+        consts::QUERY_TX_DIGESTS_BATCH,
+    )
+    .await;
+
     // since the state we've built here is valuable, let's attempt to
     // rebuild the db conn before crashing the service
     match db_call {
@@ -291,7 +300,12 @@ async fn retry_db_conn_on_err_in_select_digests(
                 .await
                 .context("Cannot revive db connection")?;
 
-            db::select_digests_since_exclusive(db, latest_db_digest).await
+            db::select_digests_since_exclusive(
+                db,
+                latest_db_digest,
+                consts::QUERY_TX_DIGESTS_BATCH,
+            )
+            .await
         }
     }
 }

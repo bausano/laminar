@@ -1,6 +1,5 @@
 use crate::http::StatusReport;
 use crate::prelude::*;
-use crate::{db, rpc};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -29,6 +28,7 @@ pub async fn start(
         // since this operation happens only once on boot, it's easier not
         // having to think about ordering
         status.next_fetch_from_seqnum.load(Ordering::SeqCst),
+        consts::FETCH_TX_DIGESTS_BATCH,
     )
     .await?;
 
@@ -38,7 +38,11 @@ pub async fn start(
         // insert previous iteration's digests into db and fetch new digests
         let (db_call, rpc_call) = tokio::join!(
             db::insert_digests(&db, &digests),
-            rpc::fetch_digests(&sui, fetch_from_seqnum)
+            rpc::fetch_digests(
+                &sui,
+                fetch_from_seqnum,
+                consts::FETCH_TX_DIGESTS_BATCH
+            )
         );
 
         // try rebuilding connection and inserting again

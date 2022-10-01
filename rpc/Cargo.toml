@@ -1,18 +1,11 @@
 [package]
-name = "tx-iterator"
+name = "rpc"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-db = { path = "../db" }
-dotenv = "0.15"
-env_logger = "0.9"
 futures = "0.3"
-log = "0.4"
 misc = { path = "../misc" }
-rpc = { path = "../rpc" }
 sui-sdk = { git = "https://github.com/MystenLabs/sui", branch = "devnet" }
 tokio = { version = "1.20", features = ["macros"] }
-tokio-postgres = "0.7"
-warp = "0.3"

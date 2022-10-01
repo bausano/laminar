@@ -1,0 +1,10 @@
+[package]
+name = "db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+itertools = "0.10"
+misc = { path = "../misc" }
+tokio-postgres = "0.7"
