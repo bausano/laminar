@@ -4,6 +4,7 @@ members = [
     "misc",
     "rpc",
     "tx-iterator",
+    "tx-puller",
 ]
 
 [profile.release]

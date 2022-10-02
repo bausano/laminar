@@ -1635,7 +1635,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "itertools",
+ "log",
  "misc",
+ "postgres-types",
+ "tokio",
  "tokio-postgres",
 ]
 
@@ -5183,6 +5186,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "postgres-derive"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e76c801e97c9cf696097369e517785b98056e98b21149384c812febfc5912f2"
+dependencies = [
+ "proc-macro2 1.0.44",
+ "quote 1.0.21",
+ "syn 1.0.100",
+]
+
+[[package]]
 name = "postgres-protocol"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5208,6 +5222,7 @@ checksum = "73d946ec7d256b04dfadc4e6a3292324e6f417124750fc5c0950f981b703a0f1"
 dependencies = [
  "bytes",
  "fallible-iterator",
+ "postgres-derive",
  "postgres-protocol",
 ]
 
@@ -8396,6 +8411,23 @@ dependencies = [
  "tokio",
  "tokio-postgres",
  "warp",
+]
+
+[[package]]
+name = "tx-puller"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "db",
+ "dotenv",
+ "env_logger",
+ "futures",
+ "log",
+ "misc",
+ "rpc",
+ "sui-sdk",
+ "tokio",
+ "tokio-postgres",
 ]
 
 [[package]]
