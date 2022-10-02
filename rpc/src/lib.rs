@@ -1,7 +1,10 @@
 use anyhow::{anyhow, Result};
 use futures::Future;
 use misc::{Digest, SeqNum};
-use sui_sdk::SuiClient;
+use sui_sdk::{
+    rpc_types::SuiTransactionResponse, types::base_types::TransactionDigest,
+    SuiClient,
+};
 use tokio::time::{sleep, Duration};
 
 /// Unlikely to be useful once Sui is adopted, but in case the network is
@@ -64,6 +67,14 @@ pub async fn digest(sui: &SuiClient, seqnum: SeqNum) -> Result<Option<Digest>> {
             .await?;
 
     Ok(txs.into_iter().next().map(|(_, digest)| digest.to_bytes()))
+}
+
+pub async fn fetch_tx(
+    sui: &SuiClient,
+    digest: &[u8],
+) -> Result<SuiTransactionResponse> {
+    let digest = TransactionDigest::new(digest.try_into()?);
+    retry_rpc(|| sui.read_api().get_transaction(digest)).await
 }
 
 async fn retry_rpc<T, F>(job: impl FnMut() -> F) -> Result<T>
