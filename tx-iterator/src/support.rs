@@ -115,7 +115,7 @@ pub async fn start(
                 .front()
                 .and_then(|(_, seqnum)| rpc_only_digests.get(seqnum))
                 .copied()
-                .unwrap_or_else(|| latest_seqnum + 1);
+                .unwrap_or(latest_seqnum + 1);
             status
                 .next_fetch_from_seqnum
                 // acts as a counter
@@ -202,7 +202,7 @@ async fn pop_observed_digests(
         } else if Instant::now().duration_since(*timestamp)
             > conf.investigate_if_tx_only_observed_on_rpc_for
         {
-            if db::has_digest(&db, digest).await? {
+            if db::has_digest(db, digest).await? {
                 // this is an unlikely but conceivable scenario:
                 //
                 // we start fetching from digest0, observe digest1 but
@@ -244,7 +244,7 @@ async fn initial_db_digests(
     fetch_from_seqnum: SeqNum,
 ) -> Result<(Digest, Vec<Digest>)> {
     let fetch_from_digest =
-        if let Some(digest) = rpc::digest(&sui, fetch_from_seqnum).await? {
+        if let Some(digest) = rpc::digest(sui, fetch_from_seqnum).await? {
             digest
         } else {
             // if digest does not exist, fetch from the latest one
@@ -255,11 +255,11 @@ async fn initial_db_digests(
             // A node might have crashed, was spawned as a support and there
             // were no tx since the last iteration.
 
-            rpc::latest_digest(&sui).await?
+            rpc::latest_digest(sui).await?
         };
 
     let db_only_digests = db::select_digests_since_inclusive(
-        &db,
+        db,
         &fetch_from_digest,
         consts::QUERY_TX_DIGESTS_BATCH,
     )
@@ -279,8 +279,8 @@ async fn select_digests_since_exclusive_with_retry(
     latest_db_digest: &Digest,
 ) -> Result<Vec<Digest>> {
     let db_call = db::select_digests_since_exclusive(
-        &db,
-        &latest_db_digest,
+        db,
+        latest_db_digest,
         consts::QUERY_TX_DIGESTS_BATCH,
     )
     .await;
