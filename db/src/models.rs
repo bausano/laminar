@@ -7,7 +7,9 @@ pub struct SuiTx {
     /// the `digests` table but keep the txs.
     pub order: i64,
     pub digest: Digest,
-    /// We're using https://github.com/near/borsh-rs to store tx info
+    pub version: String,
+    /// We're using https://crates.io/crates/bincode to store tx info. That
+    /// means this data deserializes into [`SuiTransactionResponse`].
     pub data: Vec<u8>,
 }
 

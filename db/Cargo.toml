@@ -6,8 +6,8 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 itertools = "0.10"
-misc = { path = "../misc" }
-tokio-postgres = "0.7"
 log = "0.4"
-tokio = { version = "1.20", features = ["macros"] }
+misc = { path = "../misc" }
 postgres-types = { version = "*", features = ["derive"] }
+tokio = { version = "1.20", features = ["macros"] }
+tokio-postgres = "0.7"

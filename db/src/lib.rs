@@ -161,7 +161,7 @@ pub async fn insert_txs(
     txs: &[SuiTx],
 ) -> Result<()> {
     let query = format!(
-        "INSERT INTO txs (order, digest, json) VALUES ({})",
+        "INSERT INTO txs (order, digest, version, data) VALUES ({})",
         (0..txs.len()).map(|_| "?").join(","),
     );
 

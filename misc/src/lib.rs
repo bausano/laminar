@@ -1,5 +1,7 @@
 //! Contains various ubiquitously used constructs.
 
+pub use sui_sdk;
+
 pub use sui_sdk::rpc_types::GatewayTxSeqNumber as SeqNum;
 
 /// A digest is [u8; 32] but this type is more convenient to work with in the

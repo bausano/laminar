@@ -1,10 +1,10 @@
 use anyhow::{anyhow, Result};
 use futures::Future;
-use misc::{Digest, SeqNum};
-use sui_sdk::{
+use misc::sui_sdk::{
     rpc_types::SuiTransactionResponse, types::base_types::TransactionDigest,
     SuiClient,
 };
+use misc::{Digest, SeqNum};
 use tokio::time::{sleep, Duration};
 
 /// Unlikely to be useful once Sui is adopted, but in case the network is

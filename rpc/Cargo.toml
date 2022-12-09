@@ -7,5 +7,4 @@ edition = "2021"
 anyhow = "1.0"
 futures = "0.3"
 misc = { path = "../misc" }
-sui-sdk = { git = "https://github.com/MystenLabs/sui", branch = "devnet" }
 tokio = { version = "1.20", features = ["macros"] }
