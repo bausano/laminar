@@ -8445,6 +8445,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bincode",
+ "crossbeam-channel",
  "db",
  "dotenv",
  "env_logger",
@@ -8456,6 +8457,7 @@ dependencies = [
  "serde 1.0.145",
  "tokio",
  "tokio-postgres",
+ "warp",
 ]
 
 [[package]]

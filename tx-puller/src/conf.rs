@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use std::env;
+use std::{env, net::SocketAddr};
 
 pub mod consts {
     pub mod defaults {
@@ -16,6 +16,9 @@ pub struct Conf {
     pub sui_node_url: String,
     /// How many txs to fetch from DB at once.
     pub batch_size: usize,
+    /// What's the address that the http status server should bound to.
+    /// Defaults to "127.0.0.1:80"
+    pub http_addr: SocketAddr,
 }
 
 impl Conf {
@@ -33,10 +36,16 @@ impl Conf {
             .unwrap_or(consts::defaults::BATCH_SIZE);
         info!("Batch size: {}", batch_size);
 
+        let http_addr = env::var("HTTP_ADDR")
+            .unwrap_or_else(|_| "127.0.0.1:80".to_string())
+            .parse()
+            .context("Invalid http addr")?;
+
         Ok(Self {
+            batch_size,
+            http_addr,
             sui_node_url,
             writer_conn_conf,
-            batch_size,
         })
     }
 
