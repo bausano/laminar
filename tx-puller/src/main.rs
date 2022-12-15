@@ -7,6 +7,7 @@
 //! - https://webapp.io/blog/postgres-is-the-answer
 
 mod conf;
+mod http;
 mod prelude;
 
 use conf::Conf;
@@ -34,6 +35,10 @@ async fn main() -> Result<()> {
     // TODO: figure out population and updating
     let builder = fastbloom_rs::FilterBuilder::new(100_000_000, 0.01);
     let bloom = BloomFilter::new(builder);
+
+    // http server and connect it via channel
+
+    // BloomFilter::from_u32_array();
 
     loop {
         let tx = db.transaction().await?;
